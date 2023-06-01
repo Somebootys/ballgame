@@ -9,13 +9,45 @@ pub const ENEMY_NUMBER: usize = 3;
 pub const ENEMY_SIZE: f32 = 64.0;
 pub const STAR_SIZE: f32 = 64.0;
 pub const NUMBER_OF_STARS: u8 = 5;
+pub const SPAWN_TIMER_STARS: f32 = 1.0;
+pub const STARS_MAX: u8 = 5;
 
 //components
 #[derive(Component)]
 pub struct Star {}
+
+#[derive(Resource)]
+pub struct StarSpawnTimer {
+    pub timer: Timer,
+}
+
+impl Default for StarSpawnTimer {
+    fn default() -> Self {
+        StarSpawnTimer {
+            timer: Timer::from_seconds(SPAWN_TIMER_STARS, TimerMode::Repeating),
+        }
+    }
+}
+#[derive(Resource)]
+pub struct Score {
+    pub value: u32,
+}
+
+impl Default for Score {
+    fn default() -> Self {
+        Score { value: 0 }
+    }
+}
 fn main() {
+    /*add_system runs once per frame
+    add_startup_system runs once at the start of the game
+
+
+     */
     App::new()
         .add_plugins(DefaultPlugins)
+        .init_resource::<Score>()
+        .init_resource::<StarSpawnTimer>()
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_player)
         .add_system(player_movement)
@@ -27,6 +59,9 @@ fn main() {
         .add_system(enemy_hit_player)
         .add_startup_system(spawn_stars)
         .add_system(player_hit_star)
+        .add_system(update_score)
+        .add_system(tick_star_spawn_timer)
+        .add_system(spawn_stars_over_timer)
         .run();
 }
 
@@ -282,6 +317,7 @@ pub fn player_hit_star(
     star_query: Query<(Entity, &Transform), With<Star>>,
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
+    mut score: ResMut<Score>,
 ) {
     if let Ok(player_transform) = player_query.get_single() {
         for (star_entity, star_transform) in star_query.iter() {
@@ -292,9 +328,50 @@ pub fn player_hit_star(
             let star_radius = STAR_SIZE / 2.0;
 
             if distance < player_radius + star_radius {
+                score.value += 1;
                 commands.entity(star_entity).despawn();
-                audio.play(asset_server.load("impactGlass_medium_000.ogg"));
+                audio.play(asset_server.load("audio/impactGlass_medium_000.ogg"));
             }
         }
+    }
+}
+
+pub fn update_score(score: Res<Score>) {
+    if score.is_changed() {
+        println!("Score: {}", score.value.to_string());
+    }
+}
+
+pub fn tick_star_spawn_timer(time: Res<Time>, mut star_spawn_timer: ResMut<StarSpawnTimer>) {
+    star_spawn_timer.timer.tick(time.delta());
+}
+
+pub fn spawn_single_star(
+    mut commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+) {
+    let window = window_query.get_single().unwrap();
+    let x = random::<f32>() * window.width();
+    let y = random::<f32>() * window.height();
+
+    commands.spawn((
+        SpriteBundle {
+            transform: Transform::from_xyz(x, y, 0.0),
+            texture: asset_server.load("sprites/star.png"),
+            ..default()
+        },
+        Star {},
+    ));
+}
+
+pub fn spawn_stars_over_timer(
+    commands: Commands,
+    window_query: Query<&Window, With<PrimaryWindow>>,
+    asset_server: Res<AssetServer>,
+    star_spawn_timer: ResMut<StarSpawnTimer>,
+) {
+    if star_spawn_timer.timer.finished() {
+        spawn_single_star(commands, window_query, asset_server);
     }
 }
