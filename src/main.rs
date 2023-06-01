@@ -276,13 +276,13 @@ pub fn spawn_enemy(
     }
 }
 
-
-pub fn player_hit_star(mut commands: Commands,
-    player_query: Query<&Transform, With<Player>>, 
-    star_query: Query<(Entity, &Transform), With<Star>>, 
+pub fn player_hit_star(
+    mut commands: Commands,
+    player_query: Query<&Transform, With<Player>>,
+    star_query: Query<(Entity, &Transform), With<Star>>,
     asset_server: Res<AssetServer>,
-    audio: Res<Audio>){
-
+    audio: Res<Audio>,
+) {
     if let Ok(player_transform) = player_query.get_single() {
         for (star_entity, star_transform) in star_query.iter() {
             let distance = player_transform
@@ -297,5 +297,4 @@ pub fn player_hit_star(mut commands: Commands,
             }
         }
     }
-
 }
