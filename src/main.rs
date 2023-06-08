@@ -1,4 +1,5 @@
 //use bevy::ecs::query;
+use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use rand::prelude::*;
@@ -38,6 +39,10 @@ impl Default for Score {
         Score { value: 0 }
     }
 }
+
+pub struct GameOver {
+    pub score: u32,
+}
 fn main() {
     /*add_system runs once per frame
     add_startup_system runs once at the start of the game
@@ -48,6 +53,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .init_resource::<Score>()
         .init_resource::<StarSpawnTimer>()
+        .add_event::<GameOver>()
         .add_startup_system(spawn_camera)
         .add_startup_system(spawn_player)
         .add_system(player_movement)
@@ -62,6 +68,8 @@ fn main() {
         .add_system(update_score)
         .add_system(tick_star_spawn_timer)
         .add_system(spawn_stars_over_timer)
+        .add_system(exit_game)
+        .add_system(handle_game_over)
         .run();
 }
 
@@ -244,10 +252,12 @@ pub fn confine_enemy_movement(
 
 pub fn enemy_hit_player(
     mut commands: Commands,
+    mut game_over_event: EventWriter<GameOver>,
     mut player_query: Query<(Entity, &Transform), With<Player>>,
     enemy_query: Query<&Transform, With<Enemy>>,
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
+    score: Res<Score>,
 ) {
     if let Ok((player_entity, player_transform)) = player_query.get_single_mut() {
         for enemy_transform in enemy_query.iter() {
@@ -260,6 +270,7 @@ pub fn enemy_hit_player(
             if distance < player_radius + enemy_radius {
                 commands.entity(player_entity).despawn();
                 audio.play(asset_server.load("audio/explosionCrunch_002.ogg"));
+                game_over_event.send(GameOver { score: score.value });
             }
         }
     }
@@ -373,5 +384,20 @@ pub fn spawn_stars_over_timer(
 ) {
     if star_spawn_timer.timer.finished() {
         spawn_single_star(commands, window_query, asset_server);
+    }
+}
+
+pub fn exit_game(keyboard_input: Res<Input<KeyCode>>, mut exit: EventWriter<AppExit>) {
+    if keyboard_input.just_pressed(KeyCode::Escape) {
+        exit.send(AppExit);
+    }
+}
+
+pub fn handle_game_over(mut game_over_writer: EventReader<GameOver>) {
+    for event in game_over_writer.iter() {
+        println!(
+            "Game Over, your final score is: {}",
+            event.score.to_string()
+        );
     }
 }
